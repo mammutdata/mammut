@@ -1,0 +1,58 @@
+name:         mammut
+version:      0.9.0
+synopsis:     Command-line tool to manage a Mammut vault
+description:  This tool allows one to manage a Mammut vault. Mammut is a backup service.
+category:     Backup
+homepage:     https://www.mammutdata.com
+author:       Thomas Feron <thomas.feron@redspline.com>
+license:      BSD3
+license-file: LICENSE
+
+ghc-options:
+  - -Wall
+
+dependencies:
+  - attoparsec
+  - base >=4.9 && <5
+  - directory
+  - filepath
+  - lens
+  - mtl
+  - time
+
+default-extensions:
+  - DeriveGeneric
+  - FlexibleContexts
+  - GADTs
+  - OverloadedStrings
+  - RecordWildCards
+  - TemplateHaskell
+  - TypeApplications
+
+library:
+  source-dirs: lib
+  dependencies:
+    - bytestring
+    - cryptonite
+    - extensible-effects
+    - memory
+
+executables:
+  mammut:
+    source-dirs: src
+    main:        Main.hs
+    dependencies:
+      - mammut
+
+tests:
+  unit-tests:
+    source-dirs: tests
+    main:        Suite.hs
+    ghc-options: -threaded
+    dependencies:
+      - mammut
+      - hedgehog
+      - temporary
+      - tasty
+      - tasty-hedgehog
+      - tasty-hunit
