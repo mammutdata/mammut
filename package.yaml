@@ -14,13 +14,16 @@ ghc-options:
 dependencies:
   - attoparsec
   - base >=4.9 && <5
+  - bytestring
   - directory
   - filepath
   - lens
+  - memory
   - mtl
   - time
 
 default-extensions:
+  - DataKinds
   - DeriveGeneric
   - FlexibleContexts
   - GADTs
@@ -28,14 +31,13 @@ default-extensions:
   - RecordWildCards
   - TemplateHaskell
   - TypeApplications
+  - TypeOperators
 
 library:
   source-dirs: lib
   dependencies:
-    - bytestring
     - cryptonite
     - extensible-effects
-    - memory
 
 executables:
   mammut:

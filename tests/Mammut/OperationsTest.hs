@@ -16,15 +16,33 @@ operationsTests = testGroup "Mammut.Operations"
 
 ioTests :: TestTree
 ioTests = testGroup "IO operations"
-  [ testProperty "writeVault and readVault are reciprocal" $ property $ do
+  [ testProperty "writeVaultIO and readVaultIO are inverses" $ property $ do
       dir   <- createTestDirectory
-      key   <- forAll encryptionKeyGen
       vault <- forAll $ vaultGen dir
 
       -- Other tests might have used the same directory
       liftIO $ removeDirectoryRecursive' $ vault ^. vaultLocation
 
-      liftIO $ writeVaultIO key vault
-      vault' <- liftIO $ readVaultIO key $ vault ^. vaultLocation
+      liftIO $ writeVaultIO vault
+      vault' <- liftIO $
+        readVaultIO (vault ^. vaultKey) (vault ^. vaultLocation)
       vault === vault'
+
+  , testProperty "writePlainObjectIO and readPlainObjectIO are\
+                 \ inverses" $ property $ do
+      dir      <- createTestDirectory
+      vault    <- forAll $ emptyVaultGen dir
+      contents <- forAll contentsGen
+
+      -- Other tests might have used the same directory
+      liftIO $ removeDirectoryRecursive' $ vault ^. vaultLocation
+
+      eHash <- liftIO $ writePlainObjectIO vault contents
+      case eHash of
+        Left err -> do
+          annotateShow err
+          failure
+        Right hash -> do
+          eContents <- liftIO $ readPlainObjectIO vault hash
+          eContents === Right contents
   ]

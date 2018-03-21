@@ -6,7 +6,7 @@ import Data.Time (UTCTime)
 
 import Control.Lens (makeLenses)
 
-import Mammut.Crypto
+import Mammut.Crypto.Internal
 
 -- | Objects can contain data of different types in different formats.
 data ObjectType
@@ -52,7 +52,8 @@ makeLenses ''Version
 
 -- | Directory containing all backed-up versions of some data.
 data Vault = Vault
-  { _vaultLocation :: FilePath -- ^ Absolute path to the vault.
+  { _vaultKey      :: Key      -- ^ Encryption key that secures the vault.
+  , _vaultLocation :: FilePath -- ^ Absolute path to the vault.
   , _vaultVersions :: [Signed Version]
   -- ^ List of versions that have been backed up.
   } deriving (Eq, Show, Generic)
