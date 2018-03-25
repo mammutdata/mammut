@@ -56,6 +56,12 @@ runMammut = handle_relay return $ \action rest -> case action of
       Left err -> throwError err
       Right contents -> rest contents
 
+  ReadDirectory vault hash -> do
+    eDirectory <- lift $ liftIO $ readDirectoryIO vault hash
+    case eDirectory of
+      Left err -> throwError err
+      Right dir -> rest dir
+
   WriteVault vault -> do
     lift $ liftIO $ writeVaultIO vault
     rest ()
@@ -66,4 +72,8 @@ runMammut = handle_relay return $ \action rest -> case action of
       Left err -> throwError err
       Right hash -> rest hash
 
-  _ -> error "Not implemented yet."
+  WriteDirectory vault dir -> do
+    eHash <- lift $ liftIO $ writeDirectoryIO vault dir
+    case eHash of
+      Left err -> throwError err
+      Right hash -> rest hash

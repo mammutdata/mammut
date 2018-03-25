@@ -12,7 +12,7 @@ import Mammut.Crypto.Internal
 data ObjectType
   = PlainObject     -- ^ The contents of a file as is.
   | DirectoryObject -- ^ A structure describing the contents of a directory.
-  deriving Generic
+  deriving (Eq, Show, Generic)
 
 makeLenses ''ObjectType
 
@@ -24,7 +24,7 @@ data DirectoryItem = DirectoryItem
   { _itemName :: FilePath   -- ^ Name of the file or directory.
   , _itemType :: ObjectType -- ^ Type and format of the object.
   , _itemHash :: ObjectHash -- ^ Link to the object.
-  } deriving Generic
+  } deriving (Eq, Show, Generic)
 
 makeLenses ''DirectoryItem
 
@@ -35,7 +35,7 @@ makeLenses ''DirectoryItem
 -- tampering of a directory object, they are signed. See 'Signed'.
 newtype Directory = Directory
   { _directoryItems :: [DirectoryItem] -- ^ Files or subdirectories.
-  } deriving Generic
+  } deriving (Eq, Show, Generic)
 
 makeLenses ''Directory
 
@@ -54,7 +54,7 @@ makeLenses ''Version
 data Vault = Vault
   { _vaultKey      :: Key      -- ^ Encryption key that secures the vault.
   , _vaultLocation :: FilePath -- ^ Absolute path to the vault.
-  , _vaultVersions :: [Signed Version]
+  , _vaultVersions :: [Version]
   -- ^ List of versions that have been backed up.
   } deriving (Eq, Show, Generic)
 

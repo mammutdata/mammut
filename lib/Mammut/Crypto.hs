@@ -49,11 +49,8 @@ parseSigned key parser = do
 
 -- | Write a signed value with its signature so that it can be read by
 -- 'parseSigned'.
-writeSigned :: Key -> (a -> BS.ByteString) -> Signed a -> BS.ByteString
-writeSigned key write (Signed value) =
-  let contents  = write value
-      signature = sign key contents
-  in signature <> "\n" <> contents
+writeSigned :: Key -> BS.ByteString -> BS.ByteString
+writeSigned key contents = sign key contents <> "\n" <> contents
 
 -- | Sign some contents with HMAC-SHA3-512 and encode the signature in
 -- hexidecimal.

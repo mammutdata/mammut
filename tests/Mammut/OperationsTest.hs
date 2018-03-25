@@ -5,6 +5,7 @@ module Mammut.OperationsTest
 import Control.Lens
 import Control.Monad.Trans
 
+import Mammut.Crypto.Internal
 import Mammut.Operations.Internal
 import Mammut.Vault
 
@@ -38,11 +39,21 @@ ioTests = testGroup "IO operations"
       liftIO $ removeDirectoryRecursive' $ vault ^. vaultLocation
 
       eHash <- liftIO $ writePlainObjectIO vault contents
-      case eHash of
-        Left err -> do
-          annotateShow err
-          failure
-        Right hash -> do
-          eContents <- liftIO $ readPlainObjectIO vault hash
-          eContents === Right contents
+      hash  <- evalEither eHash
+      eContents <- liftIO $ readPlainObjectIO vault hash
+      eContents === Right contents
+
+  , testProperty "writeDirectoryIO and readDirectoryIO are\
+                 \ inverses" $ property $ do
+      dir       <- createTestDirectory
+      vault     <- forAll $ emptyVaultGen dir
+      directory <- forAll directoryGen
+
+      -- Other tests might have used the same directory
+      liftIO $ removeDirectoryRecursive' $ vault ^. vaultLocation
+
+      eHash <- liftIO $ writeDirectoryIO vault directory
+      hash  <- evalEither eHash
+      eDirectory <- liftIO $ readDirectoryIO vault hash
+      eDirectory === Right (Signed directory) -- FIXME: order
   ]

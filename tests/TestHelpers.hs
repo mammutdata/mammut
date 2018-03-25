@@ -60,16 +60,30 @@ vaultGen :: FilePath -> Gen Vault
 vaultGen dir = do
   vault <- emptyVaultGen dir
   allVersions <- Gen.list (Range.linear 0 10) versionGen
-  let versions = map Signed $ sortOn (view versionTime) $
+  let versions = sortOn (view versionTime) $
         nubBy ((==) `on` view versionTime) allVersions
   return $ vault & vaultVersions .~ versions
+
+directoryItemGen :: Gen DirectoryItem
+directoryItemGen = do
+  name <- Gen.string (Range.linear 1 30) Gen.alphaNum
+  typ  <- Gen.element [PlainObject, DirectoryObject]
+  hash <- hashGen
+  return $ DirectoryItem name typ hash
+
+directoryGen :: Gen Directory
+directoryGen = do
+  items <- Gen.list (Range.linear 0 10) directoryItemGen
+  let items' = nubBy ((==) `on` view itemName) items
+  return $ Directory items'
 
 createTestDirectory :: MonadIO m => m FilePath
 createTestDirectory = liftIO $ do
   tmp <- getCanonicalTemporaryDirectory
   let base = tmp </> "mammut-tests"
-  removeDirectoryRecursive base
-  createDirectoryIfMissing False base
+  exists <- doesDirectoryExist base
+  when exists $ removeDirectoryRecursive base
+  createDirectory base
   createTempDirectory tmp $ base </> "dir"
 
 removeDirectoryRecursive' :: MonadIO m => FilePath -> m ()

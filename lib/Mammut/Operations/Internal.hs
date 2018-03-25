@@ -33,7 +33,7 @@ readVaultIO key path = do
     contents <- BS.readFile $ dir </> name
     return $ either (const Nothing) Just $
       A.parseOnly (parseSigned key (parseVersion name)) contents
-  return $ Vault key path versions
+  return $ Vault key path (map fromSigned versions)
 
 readPlainObjectIO :: Vault -> ObjectHash
                   -> IO (Either MammutError BSL.ByteString)
@@ -49,14 +49,25 @@ readPlainObjectIO vault hash = do
       | hashFile contents == hash -> eContents
       | otherwise -> Left $ CorruptedFile path
 
+readDirectoryIO :: Vault -> ObjectHash
+                -> IO (Either MammutError (Signed Directory))
+readDirectoryIO vault hash = do
+  let (dir, fname) = objectLocation vault hash
+      path = dir </> fname
+      key  = vault ^. vaultKey
+  -- FIXME: catch IO errors
+  contents <- BS.readFile path
+  let eRes = A.parseOnly (parseSigned key (parseDirectory key)) contents
+  return $ either (Left . UnreadableDirectory) Right eRes
+
 writeVaultIO :: Vault -> IO ()
 writeVaultIO vault = do
   let dir = vault ^. vaultLocation </> "versions"
   createDirectoryIfMissing True dir
-  forM_ (vault ^. vaultVersions) $ \signedVersion -> do
-    let name = getVersionFilePath $ fromSigned signedVersion
+  forM_ (vault ^. vaultVersions) $ \version -> do
+    let name = getVersionFilePath version
     BS.writeFile (dir </> name) $
-      writeSigned (vault ^. vaultKey) writeVersion signedVersion
+      writeSigned (vault ^. vaultKey) $ writeVersion version
 
 writePlainObjectIO :: Vault -> BSL.ByteString
                    -> IO (Either MammutError ObjectHash)
@@ -75,6 +86,21 @@ writePlainObjectIO vault contents = do
         Right enc -> do
           BSL.writeFile path enc
           return $ Right hash
+
+writeDirectoryIO :: Vault -> Directory -> IO (Either MammutError ObjectHash)
+writeDirectoryIO vault directory = do
+  let key = vault ^. vaultKey
+  eContents <- writeDirectory key directory
+  case eContents of
+    Left err -> return $ Left err
+    Right contents -> do
+      let bs   = writeSigned key contents
+          hash = hashFile $ BSL.fromStrict bs
+          (dir, fname) = objectLocation vault hash
+          path = dir </> fname
+      createDirectoryIfMissing True dir
+      BS.writeFile path bs
+      return $ Right hash
 
 objectLocation :: Vault -> ObjectHash -> (FilePath, FilePath)
 objectLocation vault hash =

@@ -20,7 +20,7 @@ cryptoTests = testGroup "Mammut.Crypto"
       contents <- forAll $ Gen.bytes $ Range.linear 0 1000
       key      <- forAll encryptionKeyGen
 
-      let signed = writeSigned key id (Signed contents)
+      let signed = writeSigned key contents
       A.parseOnly (parseSigned key A.takeByteString) signed
         === Right (Signed contents)
 

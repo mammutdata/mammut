@@ -52,9 +52,18 @@ tests:
     main:        Suite.hs
     ghc-options: -threaded
     dependencies:
-      - mammut
       - hedgehog
-      - temporary
+      - mammut
       - tasty
       - tasty-hedgehog
       - tasty-hunit
+      - temporary
+
+benchmarks:
+  benchmarks:
+    source-dirs: benchmarks
+    main:        Suite.hs
+    dependencies:
+      - criterion
+      - file-embed
+      - mammut
