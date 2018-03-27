@@ -68,11 +68,10 @@ hashFile = show . hashlazy @SHA256
 encryptFile :: Key -> BSL.ByteString -> IO (Either MammutError BSL.ByteString)
 encryptFile key contents = do
   bytes <- getRandomBytes $ blockSize (undefined :: AES256)
-  return $ (BSL.fromStrict bytes <>) <$> cfb8Encrypt key bytes contents
+  return $ (BSL.fromStrict bytes <>) <$> cfbEncryptLazy key bytes contents
 
 -- | Decrypt file contents.
 decryptFile :: Key -> BSL.ByteString -> Either MammutError BSL.ByteString
 decryptFile key full = do
-  let blockSize64 = fromInteger . toInteger $ blockSize (undefined :: AES256)
-      (bytes, encrypted) = BSL.splitAt blockSize64 full
-  cfb8Decrypt key (BSL.toStrict bytes) encrypted
+  let (bytes, encrypted) = BSL.splitAt (blockSize64 (undefined :: AES256)) full
+  cfbDecryptLazy key (BSL.toStrict bytes) encrypted
