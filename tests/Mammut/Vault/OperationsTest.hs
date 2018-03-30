@@ -1,4 +1,4 @@
-module Mammut.OperationsTest
+module Mammut.Vault.OperationsTest
   ( operationsTests
   ) where
 
@@ -6,13 +6,12 @@ import Control.Lens
 import Control.Monad.Trans
 
 import Mammut.Crypto.Internal
-import Mammut.Operations
 import Mammut.Vault
 
 import TestHelpers
 
 operationsTests :: TestTree
-operationsTests = testGroup "Mammut.Operations"
+operationsTests = testGroup "Mammut.Vault.Operations"
   [ testProperty "writeVault and readVault are inverses" $ property $ do
       vault <- forAll vaultGen
 

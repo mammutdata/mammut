@@ -1,4 +1,4 @@
-module Mammut.FileFormat
+module Mammut.Vault.FileFormat
   ( parseVersion
   , writeVersion
   , getVersionFilePath
@@ -23,7 +23,7 @@ import qualified Data.ByteString.Lazy.Char8 as BSL
 
 import           Mammut.Crypto
 import           Mammut.Errors
-import           Mammut.Vault
+import           Mammut.Vault.Types
 
 parseVersion :: FilePath -> Parser Version
 parseVersion path = do

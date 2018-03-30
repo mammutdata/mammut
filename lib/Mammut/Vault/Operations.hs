@@ -1,6 +1,6 @@
-module Mammut.Operations
-  ( Mammut
-  , runMammut
+module Mammut.Vault.Operations
+  ( VaultOp
+  , runVaultOp
   , readVault
   , readPlainObject
   , readDirectory
@@ -14,40 +14,39 @@ import           Control.Eff.Exception (Exc, throwError)
 import           Control.Eff.Lift (Lift, lift)
 import           Control.Monad.Trans (MonadIO, liftIO)
 
-import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as BSL
 
 import           Mammut.Crypto
 import           Mammut.Errors
 import           Mammut.FileSystem
-import           Mammut.Operations.Internal
-import           Mammut.Vault
+import           Mammut.Vault.Operations.Internal
+import           Mammut.Vault.Types
 
-readVault :: Member Mammut r => Key -> FilePath -> Eff r Vault
+readVault :: Member VaultOp r => Key -> FilePath -> Eff r Vault
 readVault key path = send $ ReadVault key path
 
-readPlainObject :: Member Mammut r => Vault -> ObjectHash
+readPlainObject :: Member VaultOp r => Vault -> ObjectHash
                 -> Eff r BSL.ByteString
 readPlainObject vault hash = send $ ReadPlainObject vault hash
 
-readDirectory :: Member Mammut r => Vault -> ObjectHash
+readDirectory :: Member VaultOp r => Vault -> ObjectHash
               -> Eff r (Signed Directory)
 readDirectory vault hash = send $ ReadDirectory vault hash
 
-writeVault :: Member Mammut r => Vault -> Eff r ()
+writeVault :: Member VaultOp r => Vault -> Eff r ()
 writeVault = send . WriteVault
 
-writePlainObject :: Member Mammut r => Vault -> BSL.ByteString
+writePlainObject :: Member VaultOp r => Vault -> BSL.ByteString
                  -> Eff r ObjectHash
 writePlainObject vault contents = send $ WritePlainObject vault contents
 
-writeDirectory :: Member Mammut r => Vault -> Directory -> Eff r ObjectHash
+writeDirectory :: Member VaultOp r => Vault -> Directory -> Eff r ObjectHash
 writeDirectory vault dir = send $ WriteDirectory vault dir
 
-runMammut :: ( MonadIO m, SetMember Lift (Lift m) r, Member (Exc MammutError) r
-             , Member FileSystem r )
-          => Eff (Mammut ': r) a -> Eff r a
-runMammut = handle_relay return $ \action rest -> case action of
+runVaultOp :: ( Member (Exc MammutError) r, Member FileSystem r, MonadIO m
+              , SetMember Lift (Lift m) r )
+           => Eff (VaultOp ': r) a -> Eff r a
+runVaultOp = handle_relay return $ \action rest -> case action of
   ReadVault key path -> readVault_ key path >>= rest
 
   ReadPlainObject vault hash -> do

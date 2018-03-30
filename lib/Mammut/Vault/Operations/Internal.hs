@@ -1,4 +1,4 @@
-module Mammut.Operations.Internal where
+module Mammut.Vault.Operations.Internal where
 
 import           Prelude hiding (readFile, writeFile)
 
@@ -17,17 +17,17 @@ import           System.FilePath
 
 import           Mammut.Crypto
 import           Mammut.Errors
-import           Mammut.FileFormat
 import           Mammut.FileSystem
-import           Mammut.Vault
+import           Mammut.Vault.FileFormat
+import           Mammut.Vault.Types
 
-data Mammut a where
-  ReadVault        :: Key   -> FilePath   -> Mammut Vault
-  ReadPlainObject  :: Vault -> ObjectHash -> Mammut BSL.ByteString
-  ReadDirectory    :: Vault -> ObjectHash -> Mammut (Signed Directory)
-  WriteVault       :: Vault -> Mammut ()
-  WritePlainObject :: Vault -> BSL.ByteString -> Mammut ObjectHash
-  WriteDirectory   :: Vault -> Directory      -> Mammut ObjectHash
+data VaultOp a where
+  ReadVault        :: Key   -> FilePath   -> VaultOp Vault
+  ReadPlainObject  :: Vault -> ObjectHash -> VaultOp BSL.ByteString
+  ReadDirectory    :: Vault -> ObjectHash -> VaultOp (Signed Directory)
+  WriteVault       :: Vault -> VaultOp ()
+  WritePlainObject :: Vault -> BSL.ByteString -> VaultOp ObjectHash
+  WriteDirectory   :: Vault -> Directory      -> VaultOp ObjectHash
 
 readVault_ :: (Member (Exc MammutError) r, Member FileSystem r)
            => Key -> FilePath -> Eff r Vault

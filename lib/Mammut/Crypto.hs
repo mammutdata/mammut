@@ -31,7 +31,7 @@ import           Crypto.Random.Types (getRandomBytes)
 
 import           Mammut.Crypto.Internal
 import           Mammut.Errors
-import           Mammut.Vault
+import           Mammut.Vault.Types
 
 -- | Generate a 256-bits long key.
 generateKey :: IO Key

@@ -41,9 +41,9 @@ import qualified Hedgehog.Range as Range
 import           Mammut.Crypto.Internal
 import           Mammut.Errors
 import           Mammut.FileSystem.Internal hiding (FileType(..))
-import           Mammut.Operations
-import           Mammut.Operations.Internal
-import           Mammut.Vault
+import           Mammut.Vault.Operations
+import           Mammut.Vault.Operations.Internal
+import           Mammut.Vault.Types
 import qualified Mammut.FileSystem as FS
 
 {-
@@ -107,11 +107,11 @@ instance (MonadTest m, SetMember Lift (Lift m) r) => MonadTest (Eff r) where
 
 type FakeFS = HM.HashMap FilePath BSL.ByteString
 
-inTestEnv :: MonadIO m => Eff '[Mammut, FileSystem, Exc MammutError, Lift m] a
+inTestEnv :: MonadIO m => Eff '[VaultOp, FileSystem, Exc MammutError, Lift m] a
           -> m (Either MammutError a)
 inTestEnv =
     runLift . runError . flip evalState HM.empty
-            . handle_relay return fakeFS . addState . runMammut
+            . handle_relay return fakeFS . addState . runVaultOp
   where
     fakeFS :: MonadIO m => FileSystem a
            -> (a -> Eff '[State FakeFS, Exc MammutError, Lift m] b)
@@ -161,7 +161,7 @@ inTestEnv =
           Right fs -> E (inj fs) arr'
 
 inTestEnv_ :: (MonadIO m, MonadTest m)
-           => Eff '[Mammut, FileSystem, Exc MammutError, Lift m] a -> m ()
+           => Eff '[VaultOp, FileSystem, Exc MammutError, Lift m] a -> m ()
 inTestEnv_ action = do
   eRes <- inTestEnv action
   _ <- evalEither eRes
