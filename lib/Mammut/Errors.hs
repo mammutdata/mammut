@@ -11,4 +11,8 @@ data MammutError
   -- ^ The file's contents doesn't match its hash.
   | UnreadableDirectory String
   -- ^ Error while parsing a directory.
+  | FileNotFound FilePath
+  -- ^ Invalid file path.
+  | CantWriteFile FilePath String
+  -- ^ The program tried to write contents to a file but failed.
   deriving (Eq, Show)

@@ -6,54 +6,37 @@ import Control.Lens
 import Control.Monad.Trans
 
 import Mammut.Crypto.Internal
-import Mammut.Operations.Internal
+import Mammut.Operations
 import Mammut.Vault
 
 import TestHelpers
 
 operationsTests :: TestTree
 operationsTests = testGroup "Mammut.Operations"
-  [ ioTests ]
+  [ testProperty "writeVault and readVault are inverses" $ property $ do
+      vault <- forAll vaultGen
 
-ioTests :: TestTree
-ioTests = testGroup "IO operations"
-  [ testProperty "writeVaultIO and readVaultIO are inverses" $ property $ do
-      dir   <- createTestDirectory
-      vault <- forAll $ vaultGen dir
+      inTestEnv_ $ do
+        writeVault vault
+        vault' <- readVault (vault ^. vaultKey) (vault ^. vaultLocation)
+        vault === vault'
 
-      -- Other tests might have used the same directory
-      liftIO $ removeDirectoryRecursive' $ vault ^. vaultLocation
-
-      liftIO $ writeVaultIO vault
-      vault' <- liftIO $
-        readVaultIO (vault ^. vaultKey) (vault ^. vaultLocation)
-      vault === vault'
-
-  , testProperty "writePlainObjectIO and readPlainObjectIO are\
+  , testProperty "writePlainObject and readPlainObject are\
                  \ inverses" $ property $ do
-      dir      <- createTestDirectory
-      vault    <- forAll $ emptyVaultGen dir
+      vault    <- forAll emptyVaultGen
       contents <- forAll contentsGen
 
-      -- Other tests might have used the same directory
-      liftIO $ removeDirectoryRecursive' $ vault ^. vaultLocation
+      inTestEnv_ $ do
+        hash <- writePlainObject vault contents
+        contents' <- readPlainObject vault hash
+        contents' === contents
 
-      eHash <- liftIO $ writePlainObjectIO vault contents
-      hash  <- evalEither eHash
-      eContents <- liftIO $ readPlainObjectIO vault hash
-      eContents === Right contents
-
-  , testProperty "writeDirectoryIO and readDirectoryIO are\
-                 \ inverses" $ property $ do
-      dir       <- createTestDirectory
-      vault     <- forAll $ emptyVaultGen dir
+  , testProperty "writeDirectory and readDirectory are inverses" $ property $ do
+      vault     <- forAll emptyVaultGen
       directory <- forAll directoryGen
 
-      -- Other tests might have used the same directory
-      liftIO $ removeDirectoryRecursive' $ vault ^. vaultLocation
-
-      eHash <- liftIO $ writeDirectoryIO vault directory
-      hash  <- evalEither eHash
-      eDirectory <- liftIO $ readDirectoryIO vault hash
-      eDirectory === Right (Signed directory) -- FIXME: order
+      inTestEnv_ $ do
+        hash <- writeDirectory vault directory
+        directory' <- readDirectory vault hash
+        directory' === Signed directory -- FIXME: order
   ]

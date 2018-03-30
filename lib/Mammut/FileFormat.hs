@@ -11,7 +11,6 @@ import           Prelude hiding (take, takeWhile)
 import           Control.Applicative (many, (<|>))
 import           Control.Lens
 import           Control.Monad
-import           Control.Monad.Except
 
 import           Data.Attoparsec.ByteString.Char8
 import           Data.ByteArray.Encoding ( convertFromBase, convertToBase
@@ -36,8 +35,8 @@ parseVersion path = do
 
   return $ Version time hash
 
-writeVersion :: Version -> BS.ByteString
-writeVersion = BS.pack . view versionHash
+writeVersion :: Version -> BSL.ByteString
+writeVersion = BSL.pack . view versionHash
 
 getVersionFilePath :: Version -> FilePath
 getVersionFilePath =
@@ -59,13 +58,26 @@ parseDirectory key = do
 
   return $ Directory items
 
-writeDirectory :: Key -> Directory -> IO (Either MammutError BS.ByteString)
-writeDirectory key directory = runExceptT $ do
-  ls <- forM (directory ^. directoryItems) $ \item -> do
-    encName <- fmap (convertToBase Base16 . BSL.toStrict)
-               . ExceptT . encryptFile key . BSL.pack $ item ^. itemName
-    let typ = case item ^. itemType of
-          PlainObject     -> " p "
-          DirectoryObject -> " d "
-    return $ encName <> typ <> BS.pack (item ^. itemHash)
-  return $ BS.unlines ls
+writeDirectory :: Key -> BS.ByteString -> Directory
+               -> Either MammutError BSL.ByteString
+writeDirectory key firstIV directory = do
+    ls <- forMWith (directory ^. directoryItems) firstIV $ \item iv -> do
+      encryptedName <-
+        encryptFile key iv $ BSL.pack $ item ^. itemName
+      let encodedName = BSL.fromStrict . convertToBase Base16 . BSL.toStrict $
+            encryptedName
+          typ = case item ^. itemType of
+            PlainObject     -> " p "
+            DirectoryObject -> " d "
+          iv' = nextIV iv encryptedName
+      return (encodedName <> typ <> BSL.pack (item ^. itemHash), iv')
+    return $ BSL.intercalate "\n" ls
+
+  where
+    -- FIXME: Make it use an accumulator
+    forMWith :: Monad m => [a] -> b -> (a -> b -> m (c, b)) -> m [c]
+    forMWith [] _ _ = return []
+    forMWith (x:xs) z f = do
+      (y, z') <- f x z
+      ys      <- forMWith xs z' f
+      return $ y : ys

@@ -15,7 +15,9 @@ dependencies:
   - attoparsec
   - base >=4.9 && <5
   - bytestring
+  - cryptonite
   - directory
+  - extensible-effects
   - filepath
   - lens
   - memory
@@ -27,6 +29,7 @@ default-extensions:
   - DeriveGeneric
   - FlexibleContexts
   - GADTs
+  - LambdaCase
   - OverloadedStrings
   - RecordWildCards
   - TemplateHaskell
@@ -35,9 +38,6 @@ default-extensions:
 
 library:
   source-dirs: lib
-  dependencies:
-    - cryptonite
-    - extensible-effects
 
 executables:
   mammut:
@@ -58,6 +58,7 @@ tests:
       - tasty-hedgehog
       - tasty-hunit
       - temporary
+      - unordered-containers
 
 benchmarks:
   benchmarks:

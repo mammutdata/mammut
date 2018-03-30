@@ -4,7 +4,7 @@ module Mammut.CryptoTest
 
 import           Control.Monad.Trans
 
-import qualified Data.Attoparsec.ByteString as A
+import qualified Data.Attoparsec.ByteString.Lazy as A
 
 import qualified Hedgehog.Gen as Gen
 import qualified Hedgehog.Range as Range
@@ -17,17 +17,18 @@ import           TestHelpers
 cryptoTests :: TestTree
 cryptoTests = testGroup "Mammut.Crypto"
   [ testProperty "writeSigned and parseSigned are inverses" $ property $ do
-      contents <- forAll $ Gen.bytes $ Range.linear 0 1000
+      contents <- forAll contentsGen
       key      <- forAll encryptionKeyGen
 
       let signed = writeSigned key contents
-      A.parseOnly (parseSigned key A.takeByteString) signed
+      A.eitherResult (A.parse (parseSigned key A.takeLazyByteString) signed)
         === Right (Signed contents)
 
   , testProperty "encryptFile and decryptFile are inverses" $ property $ do
       contents <- forAll contentsGen
       key      <- forAll encryptionKeyGen
+      iv       <- forAll encryptionIVGen
 
-      eRes <- liftIO $ (decryptFile key =<<) <$> encryptFile key contents
+      let eRes = encryptFile key iv contents >>= decryptFile key
       eRes === Right contents
   ]

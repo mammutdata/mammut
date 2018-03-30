@@ -19,6 +19,7 @@ import qualified Data.ByteString.Lazy as BSL
 
 import           Mammut.Crypto
 import           Mammut.Errors
+import           Mammut.FileSystem
 import           Mammut.Operations.Internal
 import           Mammut.Vault
 
@@ -43,37 +44,36 @@ writePlainObject vault contents = send $ WritePlainObject vault contents
 writeDirectory :: Member Mammut r => Vault -> Directory -> Eff r ObjectHash
 writeDirectory vault dir = send $ WriteDirectory vault dir
 
-runMammut :: (MonadIO m, SetMember Lift (Lift m) r, Member (Exc MammutError) r)
+runMammut :: ( MonadIO m, SetMember Lift (Lift m) r, Member (Exc MammutError) r
+             , Member FileSystem r )
           => Eff (Mammut ': r) a -> Eff r a
 runMammut = handle_relay return $ \action rest -> case action of
-  ReadVault key path -> do
-    vault <- lift $ liftIO $ readVaultIO key path
-    rest vault
+  ReadVault key path -> readVault_ key path >>= rest
 
   ReadPlainObject vault hash -> do
-    eContents <- lift $ liftIO $ readPlainObjectIO vault hash
+    eContents <- readPlainObject_ vault hash
     case eContents of
       Left err -> throwError err
       Right contents -> rest contents
 
   ReadDirectory vault hash -> do
-    eDirectory <- lift $ liftIO $ readDirectoryIO vault hash
+    eDirectory <- readDirectory_ vault hash
     case eDirectory of
       Left err -> throwError err
       Right dir -> rest dir
 
-  WriteVault vault -> do
-    lift $ liftIO $ writeVaultIO vault
-    rest ()
+  WriteVault vault -> writeVault_ vault >>= rest
 
   WritePlainObject vault contents -> do
-    eHash <- lift $ liftIO $ writePlainObjectIO vault contents
+    iv <- lift $ liftIO generateIV
+    eHash <- writePlainObject_ vault iv contents
     case eHash of
       Left err -> throwError err
       Right hash -> rest hash
 
   WriteDirectory vault dir -> do
-    eHash <- lift $ liftIO $ writeDirectoryIO vault dir
+    iv <- lift $ liftIO generateIV
+    eHash <- writeDirectory_ vault iv dir
     case eHash of
       Left err -> throwError err
       Right hash -> rest hash
