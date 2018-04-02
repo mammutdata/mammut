@@ -20,9 +20,6 @@ import           Crypto.Cipher.Types (BlockCipher(..), Cipher(..))
 
 import           Mammut.Errors
 
--- | Signed entity. This type is use when parsing/writing something to a file.
-newtype Signed a = Signed { fromSigned :: a } deriving (Eq, Show)
-
 newtype Key = Key ScrubbedBytes deriving (Eq, Show)
 
 -- | Encrypt some lazy bytestring.
@@ -30,7 +27,7 @@ cfbEncryptLazy :: Key -> BS.ByteString -> BSL.ByteString
                -> Either MammutError BSL.ByteString
 cfbEncryptLazy (Key key) bytes contents =
     case cipherInit key of
-      CryptoFailed error  -> Left $ CryptoniteError error
+      CryptoFailed err -> Left $ CryptoniteError err
       CryptoPassed cipher ->
         Right $ BSL.fromChunks $ go cipher 0 bytes contents
 
@@ -52,7 +49,7 @@ cfbDecryptLazy :: Key -> BS.ByteString -> BSL.ByteString
                -> Either MammutError BSL.ByteString
 cfbDecryptLazy (Key key) bytes encrypted = do
     case cipherInit key of
-      CryptoFailed error  -> Left $ CryptoniteError error
+      CryptoFailed err -> Left $ CryptoniteError err
       CryptoPassed cipher ->
         Right $ BSL.fromChunks $ go cipher "" bytes encrypted
 

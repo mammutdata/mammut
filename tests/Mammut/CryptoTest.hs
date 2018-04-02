@@ -22,7 +22,7 @@ cryptoTests = testGroup "Mammut.Crypto"
 
       let signed = writeSigned key contents
       A.eitherResult (A.parse (parseSigned key A.takeLazyByteString) signed)
-        === Right (Signed contents)
+        === Right contents
 
   , testProperty "encryptFile and decryptFile are inverses" $ property $ do
       contents <- forAll contentsGen

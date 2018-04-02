@@ -1,19 +1,20 @@
 module Mammut.Vault.Operations
   ( VaultOp
   , runVaultOp
-  , readVault
+  , readVersions
   , readPlainObject
   , readDirectory
-  , writeVault
+  , writeVersion
   , writePlainObject
   , writeDirectory
   ) where
 
 import           Control.Eff
-import           Control.Eff.Exception (Exc, throwError)
+import           Control.Eff.Exception (Exc)
 import           Control.Eff.Lift (Lift, lift)
 import           Control.Monad.Trans (MonadIO, liftIO)
 
+import           Data.Time (UTCTime)
 import qualified Data.ByteString.Lazy as BSL
 
 import           Mammut.Crypto
@@ -22,19 +23,19 @@ import           Mammut.FileSystem
 import           Mammut.Vault.Operations.Internal
 import           Mammut.Vault.Types
 
-readVault :: Member VaultOp r => Key -> FilePath -> Eff r Vault
-readVault key path = send $ ReadVault key path
+readVersions :: Member VaultOp r => Vault -> Eff r [Version]
+readVersions = send . ReadVersions
 
 readPlainObject :: Member VaultOp r => Vault -> ObjectHash
                 -> Eff r BSL.ByteString
 readPlainObject vault hash = send $ ReadPlainObject vault hash
 
-readDirectory :: Member VaultOp r => Vault -> ObjectHash
-              -> Eff r (Signed Directory)
+readDirectory :: Member VaultOp r => Vault -> ObjectHash -> Eff r Directory
 readDirectory vault hash = send $ ReadDirectory vault hash
 
-writeVault :: Member VaultOp r => Vault -> Eff r ()
-writeVault = send . WriteVault
+writeVersion :: Member VaultOp r => Vault -> UTCTime -> ObjectHash
+             -> Eff r Version
+writeVersion vault time hash = send $ WriteVersion vault time hash
 
 writePlainObject :: Member VaultOp r => Vault -> BSL.ByteString
                  -> Eff r ObjectHash
@@ -47,32 +48,20 @@ runVaultOp :: ( Member (Exc MammutError) r, Member FileSystem r, MonadIO m
               , SetMember Lift (Lift m) r )
            => Eff (VaultOp ': r) a -> Eff r a
 runVaultOp = handle_relay return $ \action rest -> case action of
-  ReadVault key path -> readVault_ key path >>= rest
+  ReadVersions vault -> readVersions_ vault >>= rest
 
-  ReadPlainObject vault hash -> do
-    eContents <- readPlainObject_ vault hash
-    case eContents of
-      Left err -> throwError err
-      Right contents -> rest contents
+  ReadPlainObject vault hash -> readPlainObject_ vault hash >>= rest
 
-  ReadDirectory vault hash -> do
-    eDirectory <- readDirectory_ vault hash
-    case eDirectory of
-      Left err -> throwError err
-      Right dir -> rest dir
+  ReadDirectory vault hash -> readDirectory_ vault hash >>= rest
 
-  WriteVault vault -> writeVault_ vault >>= rest
+  WriteVersion vault time hash -> writeVersion_ vault time hash >>= rest
 
   WritePlainObject vault contents -> do
     iv <- lift $ liftIO generateIV
-    eHash <- writePlainObject_ vault iv contents
-    case eHash of
-      Left err -> throwError err
-      Right hash -> rest hash
+    hash <- writePlainObject_ vault iv contents
+    rest hash
 
   WriteDirectory vault dir -> do
     iv <- lift $ liftIO generateIV
-    eHash <- writeDirectory_ vault iv dir
-    case eHash of
-      Left err -> throwError err
-      Right hash -> rest hash
+    hash <- writeDirectory_ vault iv dir
+    rest hash

@@ -12,17 +12,20 @@ import TestHelpers
 
 operationsTests :: TestTree
 operationsTests = testGroup "Mammut.Vault.Operations"
-  [ testProperty "writeVault and readVault are inverses" $ property $ do
+  [ testProperty "writeVersion writes a version that is listed by\
+                 \ readVersions" $ property $ do
       vault <- forAll vaultGen
+      time  <- forAll utctimeGen
+      hash  <- forAll hashGen
 
       inTestEnv_ $ do
-        writeVault vault
-        vault' <- readVault (vault ^. vaultKey) (vault ^. vaultLocation)
-        vault === vault'
+        version  <- writeVersion vault time hash
+        versions <- readVersions vault
+        versions === [version]
 
   , testProperty "writePlainObject and readPlainObject are\
                  \ inverses" $ property $ do
-      vault    <- forAll emptyVaultGen
+      vault    <- forAll vaultGen
       contents <- forAll contentsGen
 
       inTestEnv_ $ do
@@ -31,11 +34,11 @@ operationsTests = testGroup "Mammut.Vault.Operations"
         contents' === contents
 
   , testProperty "writeDirectory and readDirectory are inverses" $ property $ do
-      vault     <- forAll emptyVaultGen
+      vault     <- forAll vaultGen
       directory <- forAll directoryGen
 
       inTestEnv_ $ do
         hash <- writeDirectory vault directory
         directory' <- readDirectory vault hash
-        directory' === Signed directory -- FIXME: order
+        directory' === directory
   ]

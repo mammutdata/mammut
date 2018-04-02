@@ -1,7 +1,6 @@
 module Mammut.Vault.FileFormat
   ( parseVersion
   , writeVersion
-  , getVersionFilePath
   , parseDirectory
   , writeDirectory
   ) where
@@ -27,20 +26,20 @@ import           Mammut.Vault.Types
 
 parseVersion :: FilePath -> Parser Version
 parseVersion path = do
-  time <- parseTimeM True defaultTimeLocale "%Y%m%d%H%M%S" path
+  timeStr <- BS.unpack <$> take (length ("YYYYmmddHHMMSS" :: String))
+  time <- parseTimeM True defaultTimeLocale "%Y%m%d%H%M%S" timeStr
+  _ <- endOfLine
 
   hash <- BS.unpack <$> takeWhile isHexDigit
   _ <- many endOfLine
   endOfInput
 
-  return $ Version time hash
+  return $ Version path time hash
 
 writeVersion :: Version -> BSL.ByteString
-writeVersion = BSL.pack . view versionHash
-
-getVersionFilePath :: Version -> FilePath
-getVersionFilePath =
-  formatTime defaultTimeLocale "%Y%m%d%H%M%S" . view versionTime
+writeVersion version = BSL.pack $
+  formatTime defaultTimeLocale "%Y%m%d%H%M%S" (version ^. versionTime) ++ "\n"
+  ++ version ^. versionHash
 
 parseDirectory :: Key -> Parser Directory
 parseDirectory key = do

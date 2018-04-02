@@ -33,6 +33,7 @@ default-extensions:
   - OverloadedStrings
   - RecordWildCards
   - TemplateHaskell
+  - TupleSections
   - TypeApplications
   - TypeOperators
 
@@ -45,6 +46,7 @@ executables:
     main:        Main.hs
     dependencies:
       - mammut
+      - optparse-applicative
 
 tests:
   unit-tests:

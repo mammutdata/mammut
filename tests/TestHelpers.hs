@@ -69,21 +69,16 @@ contentsGen :: Gen BSL.ByteString
 contentsGen = fmap BSL.fromStrict . Gen.bytes $ Range.linear 0 1000
 
 versionGen :: Gen Version
-versionGen = Version <$> utctimeGen <*> hashGen
-
-emptyVaultGen :: Gen Vault
-emptyVaultGen = do
-  key  <- encryptionKeyGen
-  path <- Gen.string (Range.singleton 20) Gen.alphaNum
-  return $ Vault key ("/path/to/vault" </> path) []
+versionGen = Version
+  <$> Gen.string (Range.linear 1 10) Gen.alphaNum
+  <*> utctimeGen
+  <*> hashGen
 
 vaultGen :: Gen Vault
 vaultGen = do
-  vault <- emptyVaultGen
-  allVersions <- Gen.list (Range.linear 0 10) versionGen
-  let versions = sortOn (view versionTime) $
-        nubBy ((==) `on` view versionTime) allVersions
-  return $ vault & vaultVersions .~ versions
+  key  <- encryptionKeyGen
+  path <- Gen.string (Range.singleton 20) Gen.alphaNum
+  return $ Vault key ("/path/to/vault" </> path)
 
 directoryItemGen :: Gen DirectoryItem
 directoryItemGen = do
@@ -112,6 +107,7 @@ inTestEnv :: MonadIO m => Eff '[VaultOp, FileSystem, Exc MammutError, Lift m] a
 inTestEnv =
     runLift . runError . flip evalState HM.empty
             . handle_relay return fakeFS . addState . runVaultOp
+
   where
     fakeFS :: MonadIO m => FileSystem a
            -> (a -> Eff '[State FakeFS, Exc MammutError, Lift m] b)

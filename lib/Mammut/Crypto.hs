@@ -1,8 +1,8 @@
 module Mammut.Crypto
-  ( Signed
-  , fromSigned
-  , Key
+  ( Key
   , generateKey
+  , keyFromBS
+  , keyFromFile
   , generateIV
   , nextIV
   , parseSigned
@@ -12,6 +12,10 @@ module Mammut.Crypto
   , decryptFile
   ) where
 
+import           Prelude hiding (readFile)
+
+import           Control.Eff
+import           Control.Eff.Exception (Exc, throwError)
 import           Control.Monad (unless)
 
 import           Data.Attoparsec.ByteString.Lazy (Parser, parse, eitherResult)
@@ -31,11 +35,26 @@ import           Crypto.Random.Types (getRandomBytes)
 
 import           Mammut.Crypto.Internal
 import           Mammut.Errors
+import           Mammut.FileSystem
 import           Mammut.Vault.Types
 
 -- | Generate a 256-bits long key.
 generateKey :: IO Key
 generateKey = Key <$> getRandomBytes 32
+
+-- | Return a key from the given bytestring.
+keyFromBS :: BS.ByteString -> Maybe Key
+keyFromBS bs | BS.length bs == 32 = Just $ Key $ convert bs
+             | otherwise = Nothing
+
+-- | Read a key from a file.
+keyFromFile :: (Member (Exc MammutError) r, Member FileSystem r) => FilePath
+            -> Eff r Key
+keyFromFile path = do
+  contents <- BSL.toStrict <$> readFile path
+  case keyFromBS contents of
+    Nothing  -> throwError $ InvalidKey path
+    Just key -> return key
 
 -- | Generate a initialisation vector for AES256 encryption.
 generateIV :: IO BS.ByteString
@@ -48,7 +67,7 @@ nextIV iv enc =
   in BSL.toStrict . BSL.take size $ BSL.drop size enc <> BSL.fromStrict iv
 
 -- | Parse some contents preceded by a signature.
-parseSigned :: Key -> Parser a -> Parser (Signed a)
+parseSigned :: Key -> Parser a -> Parser a
 parseSigned key parser = do
   signature <- A.take $ hashDigestSize SHA3_512 * 2 -- encoded in hexadecimal
   _         <- A.endOfLine
@@ -57,7 +76,7 @@ parseSigned key parser = do
   let signature' = sign key contents
 
   unless (BSL.fromStrict signature == signature') $ fail "invalid signature"
-  either fail (return . Signed) $ eitherResult $ parse parser contents
+  either fail return $ eitherResult $ parse parser contents
 
 -- | Write a signed value with its signature so that it can be read by
 -- 'parseSigned'.

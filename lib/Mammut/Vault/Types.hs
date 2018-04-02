@@ -44,7 +44,8 @@ makeLenses ''Directory
 -- As for directories, these links are stored unencrypted and are signed to
 -- avoid tampering. See 'Signed'
 data Version = Version
-  { _versionTime :: UTCTime    -- ^ Time of the backup.
+  { _versionName :: String     -- ^ Name identifying the version.
+  , _versionTime :: UTCTime    -- ^ Time of the backup.
   , _versionHash :: ObjectHash -- ^ Directory object for the version.
   } deriving (Eq, Show, Generic)
 
@@ -54,8 +55,6 @@ makeLenses ''Version
 data Vault = Vault
   { _vaultKey      :: Key      -- ^ Encryption key that secures the vault.
   , _vaultLocation :: FilePath -- ^ Absolute path to the vault.
-  , _vaultVersions :: [Version]
-  -- ^ List of versions that have been backed up.
   } deriving (Eq, Show, Generic)
 
 makeLenses ''Vault

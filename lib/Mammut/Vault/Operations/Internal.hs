@@ -7,8 +7,8 @@ import           Control.Eff.Exception (Exc, throwError, catchError)
 import           Control.Lens
 import           Control.Monad
 
-import           Data.List (sort)
-import           Data.Maybe (catMaybes)
+import           Data.List (find, sort)
+import           Data.Time (UTCTime, defaultTimeLocale, formatTime)
 import qualified Data.Attoparsec.ByteString.Lazy as A
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as BSL
@@ -22,93 +22,106 @@ import           Mammut.Vault.FileFormat
 import           Mammut.Vault.Types
 
 data VaultOp a where
-  ReadVault        :: Key   -> FilePath   -> VaultOp Vault
+  ReadVersions     :: Vault -> VaultOp [Version]
   ReadPlainObject  :: Vault -> ObjectHash -> VaultOp BSL.ByteString
-  ReadDirectory    :: Vault -> ObjectHash -> VaultOp (Signed Directory)
-  WriteVault       :: Vault -> VaultOp ()
+  ReadDirectory    :: Vault -> ObjectHash -> VaultOp Directory
+  WriteVersion     :: Vault -> UTCTime -> ObjectHash -> VaultOp Version
   WritePlainObject :: Vault -> BSL.ByteString -> VaultOp ObjectHash
   WriteDirectory   :: Vault -> Directory      -> VaultOp ObjectHash
 
-readVault_ :: (Member (Exc MammutError) r, Member FileSystem r)
-           => Key -> FilePath -> Eff r Vault
-readVault_ key path = do
-  let dir = path </> "versions"
+-- FIXME: Make those exceptions catchable by the program
+
+readVersions_ :: (Member (Exc MammutError) r, Member FileSystem r)
+              => Vault -> Eff r [Version]
+readVersions_ vault = do
+  let dir = vault ^. vaultLocation </> "versions"
   names <- listDirectory dir `catchError` \case
     FileNotFound _ -> return []
     e -> throwError e
-  versions <- fmap catMaybes . forM (sort names) $ \name -> do
-    contents <- readFile $ dir </> name
-    return $ A.maybeResult $
-      A.parse (parseSigned key (parseVersion name)) contents
-  return $ Vault key path (map fromSigned versions)
+
+  forM (sort names) $ \name -> do
+    let path = dir </> name
+    contents <- readFile path
+    either (throwError . UnreadableVersion path) return $ A.eitherResult $
+      A.parse (parseSigned (vault ^. vaultKey) (parseVersion name)) contents
 
 readPlainObject_ :: (Member (Exc MammutError) r, Member FileSystem r)
-                 => Vault -> ObjectHash
-                 -> Eff r (Either MammutError BSL.ByteString)
+                 => Vault -> ObjectHash -> Eff r BSL.ByteString
 readPlainObject_ vault hash = do
   let (dir, fname) = objectLocation vault hash
       path = dir </> fname
   encrypted <- readFile path
-  let eContents = decryptFile (vault ^. vaultKey) encrypted
-  return $ case eContents of
-    Left _ -> eContents
+  case decryptFile (vault ^. vaultKey) encrypted of
+    Left err -> throwError err
     Right contents
-      | hashFile contents == hash -> eContents
-      | otherwise -> Left $ CorruptedFile path
+      | hashFile contents == hash -> return contents
+      | otherwise -> throwError $ CorruptedFile path
 
 readDirectory_ :: (Member (Exc MammutError) r, Member FileSystem r)
-               => Vault -> ObjectHash
-               -> Eff r (Either MammutError (Signed Directory))
+               => Vault -> ObjectHash -> Eff r Directory
 readDirectory_ vault hash = do
   let (dir, fname) = objectLocation vault hash
       path = dir </> fname
       key  = vault ^. vaultKey
-  -- FIXME: catch IO errors
   contents <- readFile path
-  let eRes = A.eitherResult $
-        A.parse (parseSigned key (parseDirectory key)) contents
-  return $ either (Left . UnreadableDirectory) Right eRes
+  either (throwError . UnreadableDirectory path) return $ A.eitherResult $
+    A.parse (parseSigned key (parseDirectory key)) contents
 
-writeVault_ :: (Member (Exc MammutError) r, Member FileSystem r)
-            => Vault -> Eff r ()
-writeVault_ vault = do
-  let dir = vault ^. vaultLocation </> "versions"
-  forM_ (vault ^. vaultVersions) $ \version -> do
-    let name = getVersionFilePath version
-    writeFile (dir </> name) $
-      writeSigned (vault ^. vaultKey) $ writeVersion version
+writeVersion_ :: (Member (Exc MammutError) r, Member FileSystem r)
+              => Vault -> UTCTime -> ObjectHash -> Eff r Version
+writeVersion_ vault time hash = do
+    versions <- readVersions_ vault
+    let f v = v ^. versionTime == time && v ^. versionHash == hash
+    case find f versions of
+      Just version -> return version
+      Nothing -> do
+        let base    = formatTime defaultTimeLocale "%Y%m%d%H%M" time
+            name    = findName (map (view versionName) versions) base Nothing
+            path    = vault ^. vaultLocation </> "versions" </> name
+            version = Version name time hash
+        writeFile path $ writeSigned (vault ^. vaultKey) $ writeVersion version
+        return version
+
+  where
+    findName :: [String] -> String -> Maybe Int -> String
+    findName takens base = \case
+      Nothing | base `elem` takens -> findName takens base (Just 0)
+              | otherwise -> base
+      Just c -> let name = base ++ '.' : show c
+                in if name `elem` takens
+                     then findName takens base (Just (c+1))
+                     else name
 
 writePlainObject_ :: (Member (Exc MammutError) r, Member FileSystem r)
-                  => Vault -> BS.ByteString
-                  -> BSL.ByteString -> Eff r (Either MammutError ObjectHash)
+                  => Vault -> BS.ByteString -> BSL.ByteString
+                  -> Eff r ObjectHash
 writePlainObject_ vault iv contents = do
   let hash         = hashFile contents
       (dir, fname) = objectLocation vault hash
       path         = dir </> fname
   mType <- checkFile path
   case mType of
-    Just _ -> return $ Right hash
+    Just _ -> return hash
     Nothing -> do
       case encryptFile (vault ^. vaultKey) iv contents of
-        Left err -> return $ Left err
+        Left err -> throwError err
         Right enc -> do
           writeFile path enc
-          return $ Right hash
+          return hash
 
 writeDirectory_ :: (Member (Exc MammutError) r, Member FileSystem r)
-                => Vault -> BS.ByteString -> Directory
-                -> Eff r (Either MammutError ObjectHash)
+                => Vault -> BS.ByteString -> Directory -> Eff r ObjectHash
 writeDirectory_ vault iv directory = do
   let key = vault ^. vaultKey
   case writeDirectory key iv directory of
-    Left err -> return $ Left err
+    Left err -> throwError err
     Right contents -> do
       let bsl  = writeSigned key contents
           hash = hashFile bsl
           (dir, fname) = objectLocation vault hash
           path = dir </> fname
       writeFile path bsl
-      return $ Right hash
+      return hash
 
 objectLocation :: Vault -> ObjectHash -> (FilePath, FilePath)
 objectLocation vault hash =
