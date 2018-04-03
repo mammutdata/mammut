@@ -13,6 +13,7 @@ import System.IO
 
 import Mammut.Commands.Backup
 import Mammut.Commands.GenerateKey
+import Mammut.Commands.ListVersions
 import Mammut.Commands.Restore
 import Mammut.Crypto
 import Mammut.Errors
@@ -42,6 +43,9 @@ main = do
     Restore name path -> do
       key <- keyFromFile keyFile
       restoreCommand key vaultPath name path
+    ListVersions -> do
+      key <- keyFromFile keyFile
+      listVersionsCommand key vaultPath
 
   case eRes of
     Left err -> do

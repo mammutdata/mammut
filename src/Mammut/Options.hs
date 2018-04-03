@@ -14,6 +14,7 @@ data Command
   = GenerateKey
   | Backup FilePath
   | Restore String FilePath
+  | ListVersions
 
 data Options = Options
   { optsKeyPath   :: Maybe FilePath
@@ -54,7 +55,10 @@ commandParser = subparser
    <> command "restore"
         (info (helper <*> withOptions
                       <*> (Restore <$> versionArgument <*> directoryArgument))
-              (progDesc "Restore a version from the vault to some directory.")))
+              (progDesc "Restore a version from the vault to some directory."))
+   <> command "list-versions"
+        (info (helper <*> withOptions <*> pure ListVersions)
+              (progDesc "List all versions saved in the vault.")))
 
 directoryArgument :: Parser FilePath
 directoryArgument = strArgument $ metavar "DIRECTORY"
